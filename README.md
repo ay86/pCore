@@ -1,7 +1,9 @@
 #JS Power Core
->这是一个javascript UI 效果库
->使用动态加载技术，分模块加载所需的JS文件。
->目前还十分的弱小。DOM库使用了[jClass](http://github.com/ay86/jClass)。
+>这是一个JavaScript UI 框架，使用动态加载技术，分模块加载资源文件，分别以组件形式或者模版形式渲染界面。
+
+>Since: 2013-1-1
+
+>Author: AngusYoung angusyoung@mrxcool.com
 
 ##PCORE.extend
 
