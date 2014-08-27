@@ -27,7 +27,7 @@ PCORE.extend(oTarget, oParent);
 
 定义组件时使用，内部通过[PCORE.extend](#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（须组件属性存在`Init()`方法）。
 ```js
-PCORE.ui.window = PCORE.make(PCORE.ui, {
+PCORE.widget.Window = PCORE.make(PCORE.ui, {
 	title: 'Normal Title',
 	close: function () {
 		// close windows function
@@ -97,10 +97,12 @@ var oTmpl=PCORE.parse('simple.tpl', {
 
 	资源路径
 配置资源路径，用于[PCORE.use](#pcoreuse)加载JS的相对路径，默认为“/”，可以根据项目情况定义。
-##一二三事
-> 感谢Extjs, Ant.js提供部分代码思路
+***
+##开发的事
+> 感谢ExtJs, Ant.js启发部分代码思路
 
 > 感谢以下友人在开发过程中的探讨以及帮助
+
 > * @天涯
 > * @Vincent
 > * @vfasky
