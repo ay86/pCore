@@ -104,3 +104,5 @@ var oTmpl=PCORE.parse('simple.tpl', {
 > * @天涯
 > * @Vincent
 > * @vfasky
+
+> 欢迎提出你的意见或建议，如有任何疑问可随时与我联系！
