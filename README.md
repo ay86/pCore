@@ -1,9 +1,9 @@
 #JS Power Core
->这是一个JavaScript UI 框架，使用动态加载技术，分模块加载资源文件，分别以组件形式或者模版形式渲染界面。
+> 这是一个JavaScript UI 框架，使用动态加载技术，分模块加载资源文件，分别以组件形式或者模版形式渲染界面。
 
->Since: 2013-1-1
+> Since: 2013-1-1
 
->Author: AngusYoung <angusyoung@mrxcool.com>
+> Author: AngusYoung <angusyoung@mrxcool.com>
 
 ##PCORE.extend
 
@@ -26,7 +26,7 @@ PCORE.extend(oTarget, oParent);
 	@param xMember {Object} 继承的对象
 	@return {Function}
 
-定义组件时使用，内部通过[PCORE.extend](README.md#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（须组件属性存在Init方法）。
+定义组件时使用，内部通过[PCORE.extend](#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（须组件属性存在Init方法）。
 ##PCORE.use
 
 ##PCORE.parse
