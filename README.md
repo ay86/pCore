@@ -26,7 +26,18 @@ PCORE.extend(oTarget, oParent);
 	@param xMember {Object} 继承的对象
 	@return {Function}
 
-定义组件时使用，内部通过[PCORE.extend](#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（须组件属性存在Init方法）。
+定义组件时使用，内部通过[PCORE.extend](#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（须组件属性存在`Init()`方法）。
+```js
+PCORE.ui.window = PCORE.make(PCORE.ui, {
+	title: 'Normal Title',
+	close: function () {
+		// close windows function
+	},
+	Init: function () {
+		// Init this widget function
+	}
+});
+```
 ##PCORE.use
 
 ##PCORE.parse
