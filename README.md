@@ -96,7 +96,7 @@ var oTmpl=PCORE.parse('simple.tpl', {
 ##PCORE.resource
 
 	资源路径
-配置资源路径，用于[PCORE.use]加载JS的相对路径，默认为“/”，可以根据项目情况定义。
+配置资源路径，用于[PCORE.use](#pcoreuse)加载JS的相对路径，默认为“/”，可以根据项目情况定义。
 ##一二三事
 > 感谢Extjs, Ant.js提供部分代码思路
 
