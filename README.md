@@ -11,11 +11,19 @@
 	@param oObject {Object} 扩展目标对象
 	@param oClass {Object} 扩展父类对象
 	@param [bOverwrite] {Boolean} 是否覆盖原有属性，默认是不覆盖
-	@param [xExtends] {String || Array} 指定只扩展的属性，字符串以“，”分隔
+	@param [xExtends] {String || Array} 指定只扩展的属性，字符串以“,”分隔
 
 扩展属性方法，通过复制父类对象的属性往目标对象，**程序内部使用**也可外部应用但是不建议。
 
 ```js
+var oParent = {
+	name: 'Angus',
+	age: 28
+};
+var oTarget = {
+	gender: 'Male'
+};
+// oTarget : { name: 'Angus', age: 28, gender: 'Male' }
 PCORE.extend(oTarget, oParent);
 ```
 ##PCORE.make
@@ -25,7 +33,7 @@ PCORE.extend(oTarget, oParent);
 	@param xMember {Object} 继承的对象
 	@return {Function}
 
-定义组件时使用，内部通过[PCORE.extend](#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（须组件属性存在`Init()`方法）。
+定义组件时使用，内部通过[PCORE.extend](#pcoreextend)方法继承类，并提供一个初始化时自动执行的事件（需组件类存在`Init()`方法）。
 ```js
 PCORE.widget.Window = PCORE.make(PCORE.ui, {
 	title: 'Normal Title',
@@ -50,7 +58,7 @@ PCORE.use('http://www.simple.com/simple.js').ready(function () {
 });
 ```
 ```js
-PCORE.user(['ui','widget/window']).ready(function () {
+PCORE.use(['ui','widget/window']).ready(function () {
 	// callback
 });
 ```
