@@ -10,25 +10,25 @@ PCORE = {};
  * 扩展类属性
  * @param oObject {Object} 扩展目标对象
  * @param oClass {Object} 扩展父类对象
- * @param [lOverwrite] {Boolean} 是否覆盖原有属性，默认是不覆盖
+ * @param [bOverwrite] {Boolean} 是否覆盖原有属性，默认是不覆盖
  * @param [xExtends] {String || Array} 指定只扩展的属性，字符串以“，”分隔
  */
-PCORE.extend = function (oObject, oClass, lOverwrite, xExtends) {
+PCORE.extend = function (oObject, oClass, bOverwrite, xExtends) {
 	var _w, i;
 	if (oObject && oClass) {
-		//lOverwrite = lOverwrite === void(0) || lOverwrite;
+		//bOverwrite = bOverwrite === void(0) || bOverwrite;
 		if (xExtends) {
 			xExtends = typeof xExtends == 'string' ? xExtends.replace(/\s+/g, '').split(',') : xExtends;
 			for (i = xExtends.length; i--;) {
 				_w = xExtends[i];
-				if (_w in oClass && (lOverwrite || !(_w in oObject))) {
+				if (_w in oClass && (bOverwrite || !(_w in oObject))) {
 					oObject[_w] = oClass[_w];
 				}
 			}
 		}
 		else {
 			for (_w in oClass) {
-				if (lOverwrite || !(_w in oObject)) {
+				if (bOverwrite || !(_w in oObject)) {
 					oObject[_w] = oClass[_w];
 				}
 			}
@@ -310,35 +310,31 @@ PCORE.parse = function (sTplPath, oOption) {
 	var _option = {
 		el: '',
 		id: '',
-		data: {},
 		events: {}
 	};
 	oOption = PCORE.extend(oOption, _option);
 	var oFn = function () {
-		this.load(sTplPath);
+		this.__load(sTplPath);
 	};
 	oFn.prototype = {
-		fire: function (sEvent) {
-			switch (sEvent) {
-				case 'ON_UPDATE':
-					if (typeof oOption.events['update'] === 'function') {
-						oOption.events['update'].call(this, this.el);
-					}
-					break;
-				case 'ON_RENDER':
-					if (typeof oOption.events['render'] === 'function') {
-						oOption.events['render'].call(this, this.el);
-					}
-					break;
+		__fire: function (sEvent) {
+			// event ON_XXX, XXX对应外部触发器events里的属性
+			// 比如ON_UPDATE事件对应触发events:{update:function(){}}
+			// 外部触发器命名规则为驼峰
+			var sEvName = sEvent.substr(3).toLowerCase();
+			sEvName = sEvName.replace(/(_\w)/g, function ($1) {
+				return $1.substr(1).toUpperCase();
+			});
+			if (typeof oOption.events[sEvName] === 'function') {
+				oOption.events[sEvName].call(this, this.el);
 			}
 		},
-		load: function (sTplPath) {
+		__load: function (sTplPath) {
 			var _this = this;
-			_this.data = PCORE.extend({}, oOption['data']);
-			_this.vm._data = _this.data;
 			// 判断模板是否存在于缓存区
 			if (PCORE.cache['tpl'][sTplPath]) {
-				_this.render(PCORE.cache['tpl'][sTplPath]);
+				_this.__updateTpl(PCORE.cache['tpl'][sTplPath]);
+				_this.render(oOption['data']);
 			}
 			else {
 				// 加载模板文件
@@ -348,13 +344,47 @@ PCORE.parse = function (sTplPath, oOption) {
 					dataType: 'TEXT',
 					cache: false,
 					success: function (sTpl) {
-						_this.render(sTpl);
+						// 将模板放入缓存
+						PCORE.cache['tpl'][sTplPath] = sTpl;
+						_this.__updateTpl(sTpl);
+						_this.render(oOption['data']);
 					},
 					error: function () {
 						PCORE.debug('template file is fail.');
 					}
 				});
 			}
+		},
+		__updateTpl: function (sTpl) {
+			var _div = document.createElement('div');
+			_div.innerHTML = sTpl;
+			var _tag = _div.getElementsByTagName('script');
+			var sTemplate;
+			// 读取指定模块，否则将认为整个模板文件只有一个模块
+			var sId = oOption['id'];
+			if (sId) {
+				for (var i = 0, nLen = _tag.length; i < nLen; i++) {
+					if (_tag[i].id === sId) {
+						sTemplate = _tag[i].innerHTML;
+						break;
+					}
+				}
+			}
+			else {
+				if (_tag.length) {
+					if (_tag[0].type === 'text/tpl') {
+						sTemplate = _tag[0].innerHTML;
+					}
+					else {
+						sTemplate = sTpl;
+					}
+				}
+			}
+			this.tpl = sTemplate;
+			this.__fire('ON_TPL_UPDATE');
+		},
+		__checkData: function () {
+			return this.data && this.vm['_data'];
 		},
 		vm: {
 			_key: {},
@@ -375,7 +405,6 @@ PCORE.parse = function (sTplPath, oOption) {
 			parseData: function (sProperty, oModel) {
 				var sVal;
 				oModel = oModel || this;
-				PCORE.debug('Parse Data ->', sProperty, oModel);
 				if (sProperty.indexOf('.') > -1) {
 					var _var = sProperty.split('.');
 					var _val = oModel;
@@ -397,12 +426,10 @@ PCORE.parse = function (sTplPath, oOption) {
 						var v;
 						// this data
 						for (v in this) {
-							PCORE.debug('This data:', 'var ' + v + '=this[\'' + v + '\']');
 							eval('var ' + v + '=this[\'' + v + '\']');
 						}
 						// model data
 						for (v in oModel) {
-							PCORE.debug('Model data:', 'var ' + v + '=oModel[\'' + v + '\']');
 							eval('var ' + v + '=oModel[\'' + v + '\']');
 						}
 						var _cmd;
@@ -416,7 +443,6 @@ PCORE.parse = function (sTplPath, oOption) {
 					}
 
 					var _expr = __fRunEval.call(this, sProperty);
-					PCORE.debug('Eval result:', _expr);
 					if (_expr != undefined) {
 						sVal = _expr;
 					}
@@ -447,10 +473,12 @@ PCORE.parse = function (sTplPath, oOption) {
 				var _this = this;
 				sHtml = sHtml.replace(/{{([^}}]*)}}/g, function (s, $1) {
 					var sVal = _this.tagBuild($1.replace(/\s/g, ''), oModel);
-					PCORE.debug(s, $1, sVal);
 					if (typeof sVal === 'object') {
 						// 渲染组件
-						return 'ob="' + _this.keyBox(sVal) + '"';
+						return '<var ob="' + _this.keyBox(sVal) + '"></var>';
+					}
+					if (typeof sVal === 'function') {
+						return (new sVal).toString();
 					}
 					else if (typeof sVal === 'string' || typeof sVal === 'number' || typeof sVal === 'boolean') {
 						// 渲染变量
@@ -464,43 +492,26 @@ PCORE.parse = function (sTplPath, oOption) {
 			}
 		},
 		// 渲染程序
-		render: function (sTpl) {
-			// 将模板放入缓存
-			PCORE.cache['tpl'][sTplPath] = sTpl;
-			var _div = document.createElement('div');
-			_div.innerHTML = sTpl;
-			var _tag = _div.getElementsByTagName('script');
-			// 读取指定模块，否则则认为整个模板文件只有一个模块
-			var sTemplate;
-			var sId = oOption['id'];
-			if (sId) {
-				for (var i = 0, nLen = _tag.length; i < nLen; i++) {
-					if (_tag[i].id === sId) {
-						sTemplate = _tag[i].innerHTML;
-						break;
-					}
-				}
+		render: function (oData) {
+			if (!oData) {
+				return;
 			}
-			else {
-				if (_tag.length) {
-					if (_tag[0].type === 'text/tpl') {
-						sTemplate = _tag[0].innerHTML;
-					}
-					else {
-						sTemplate = sTpl;
-					}
-				}
-			}
-			this.tpl = sTemplate;
-			this.update(this.tpl);
-			this.fire('ON_RENDER');
+			// 确保data非引用状态
+			this.data = PCORE.extend({}, oData);
+			this.vm['_data'] = this.data;
+			this.update();
+			this.__fire('ON_RENDER');
 		},
 		update: function (sTpl) {
+			if (!this.__checkData()) {
+				return;
+			}
 			/* 开始渲染 */
 			var _this = this;
+			_this.tpl = sTpl || _this.tpl;
 			var _el;
-			if (this.el) {
-				_el = this.el;
+			if (_this.el) {
+				_el = _this.el;
 			}
 			else {
 				// 创建节点
@@ -512,12 +523,12 @@ PCORE.parse = function (sTplPath, oOption) {
 					_el = oOption['el'];
 				}
 			}
-			_el.innerHTML = sTpl || this.tpl;
-			// 渲染指令
+			_el.innerHTML = this.tpl;
+			/*渲染指令，指令应注重优先顺序，具备先决条件的必须写在前面*/
+			// 逻辑指令
 			$('[pc-if]', _el).each(function () {
 				var $This = $(this);
 				var _if = _this.vm.tagBuild($This.attr('pc-if'));
-				PCORE.debug(typeof _if, _if);
 				if (_if && _if.length) {
 					$This.removeAttr('pc-if');
 				}
@@ -525,6 +536,7 @@ PCORE.parse = function (sTplPath, oOption) {
 					$This.remove();
 				}
 			});
+			// 循环指令
 			$('[pc-repeat]', _el).each(function () {
 				var $This = $(this);
 				var aData = _this.vm.tagBuild($This.attr('pc-repeat'));
@@ -540,20 +552,28 @@ PCORE.parse = function (sTplPath, oOption) {
 				}
 			});
 			// 渲染标签
-			PCORE.debug('Tpl DOM:', _el);
 			_el.innerHTML = _this.vm.htmlBuild(_el.innerHTML);
-			// 初始化组件
-			// TODO 是否要每次都 new
+			// 初始化模板中存在的组件
 			$('[ob]', _el).each(function () {
 				var $This = $(this);
 				var _obc = $This.attr('ob');
-				_this.vm._key[_obc].fit($This);
+				var _vClass = _this.vm._key[_obc];
+				if (_vClass.fit && typeof _vClass.fit === 'function') {
+					_vClass.fit($This);
+				}
+				else {
+					PCORE.debug('Invalid Widget or Object not support.');
+					$This.remove();
+				}
 			});
 			_this.el = _el;
 			// 返回/回调
-			_this.fire('ON_UPDATE');
+			_this.__fire('ON_UPDATE');
 		},
 		sets: function (sPath, xValue) {
+			if (!this.__checkData()) {
+				return;
+			}
 			if (typeof sPath === 'object') {
 				this.data = sPath;
 			}
@@ -568,6 +588,7 @@ PCORE.parse = function (sTplPath, oOption) {
 				}
 			}
 			PCORE.debug('Show tpl data:', this.data);
+			// TODO sets后续要做到不经update，可以单刷某值，核心作用在双向绑定
 			this.update();
 		}
 	};
