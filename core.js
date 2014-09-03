@@ -67,7 +67,7 @@ PCORE.make = function (oClass, xMember) {
  * @return {Object} 使用ready()方法执行callback函数
  */
 PCORE.use = function (xJsFile) {
-	PCORE.debug('use now...');
+	PCORE.debug('Use now...');
 	var oHead = document.getElementsByTagName('head')[0];
 	if (!oHead) {
 		return {ready: function () {
@@ -363,7 +363,7 @@ PCORE.parse = function (sTplPath, oOption) {
 						_this.render(oOption['data']);
 					},
 					error: function () {
-						PCORE.debug('template file is fail.');
+						PCORE.debug('!', 'template file is fail.');
 					}
 				});
 			}
