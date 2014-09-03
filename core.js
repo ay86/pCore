@@ -1,7 +1,7 @@
 /**
  * JavaScript Power Core
  * @Author: AngusYoung
- * @Version: 2.3
+ * @Version: 2.4
  * @Since: 13-01-01
  */
 
@@ -71,32 +71,45 @@ PCORE.use = function (xJsFile) {
 	var oHead = document.getElementsByTagName('head')[0];
 	if (!oHead) {
 		return {ready: function () {
-			alert('[pCore] DOM Error, stop this.');
+			PCORE.debug('!', 'DOM Error, stop this.');
 		}};
 	}
+	var sResource = PCORE.resource + (PCORE.resource.slice(-1) === '/' ? '' : '/');
 	var aJsFiles = typeof xJsFile === 'string' ? xJsFile.split(';') : xJsFile;
 	var i;
+
+	//检查是否外部链接
+	function __fCheckOutside(sURL) {
+		return (sURL.substr(0, 1) === '/' || sURL.substr(0, 7) === 'http://');
+	}
+
 	//拼接引用JS的URL
 	function __fGetPath(sSrc) {
 		var sJsSrc = '';
-		if (sSrc.substr(0, 1) === '/' || sSrc.substr(0, 7) === 'http://') {
+		if (__fCheckOutside(sSrc)) {
 			sJsSrc = sSrc + (sSrc.slice(-3) === '.js' ? '' : '.js');
 		}
 		else {
-			sJsSrc = PCORE.resource + (PCORE.resource.slice(-1) === '/' ? '' : '/') + sSrc + (sSrc.slice(-3) === '.js' ? '' : '.js');
+			// 在资源路径后面加上/，假如没有的话
+			sJsSrc = sResource + sSrc + (sSrc.slice(-3) === '.js' ? '' : '.js');
 		}
 		return sJsSrc;
 	}
 
-	PCORE.debug('show use list', xJsFile);
+	// 组装类格式文本xx.Xx
+	function __fFormatClass(aArray) {
+		return aArray.join('.').replace(/\.\w/g, function (s) {
+			return s.toUpperCase();
+		});
+	}
+
+	PCORE.debug('Use list', aJsFiles);
 	//判断本次导入的文件是否存在于现有的importList中，存在则移除
 	if (PCORE.importList && PCORE.importList.length > 0) {
-		PCORE.debug('has import list, show it', PCORE.importList.join(';'));
 		for (i = 0; i < aJsFiles.length; i++) {
 			var _path = __fGetPath(aJsFiles[i]);
-			PCORE.debug(i + 1, _path);
-			if ((';' + PCORE.importList.join(';') + ';').indexOf(';' + _path + ';') > 0) {
-				PCORE.debug('exist in list, delete it', aJsFiles[i]);
+			if ((';' + PCORE.importList.join(';') + ';').indexOf(';' + _path + ';') > -1) {
+				PCORE.debug('Script in the list, Delete it', aJsFiles[i]);
 				aJsFiles.splice(i, 1);
 				i--;
 			}
@@ -115,21 +128,20 @@ PCORE.use = function (xJsFile) {
 	//检查是否欲加载的JS已存在于列表，是的话就移除
 	for (i = 0; i < aJsFiles.length; i++) {
 		//存在于文件src引入
-		PCORE.debug('show script', aJsFiles[i]);
 		if (_cSrcList.indexOf('|' + __fGetPath(aJsFiles[i]) + '|') > 0) {
-			PCORE.debug('exist in head, delete it', aJsFiles[i]);
+			PCORE.debug('Script in head, Delete it', aJsFiles[i]);
 			aJsFiles.splice(i, 1);
 			i--;
 		}
 		//存在于合并引入
 		else {
-			//只对pCore组件进行对象判断
-			if (aJsFiles[i].substr(0, 1) !== '/' && aJsFiles[i].substr(0, 7) !== 'http://') {
+			//只对PCORE组件进行对象判断
+			if (!__fCheckOutside(aJsFiles[i])) {
 				//判断所用对象是否存在
 				if (aJsFiles[i].indexOf('ui') >= 0) {
 					//判断UI父类
 					if (typeof PCORE.ui === 'object') {
-						PCORE.debug('exist in CLASS, delete', aJsFiles[i]);
+						PCORE.debug('UI is exists, Delete', aJsFiles[i]);
 						aJsFiles.splice(i, 1);
 						i--;
 					}
@@ -137,26 +149,25 @@ PCORE.use = function (xJsFile) {
 				else if (aJsFiles[i].indexOf('view') >= 0) {
 					//判断VIEW父类
 					if (typeof PCORE.view === 'object') {
-						PCORE.debug('exist in CLASS, delete', aJsFiles[i]);
+						PCORE.debug('View is exists, Delete', aJsFiles[i]);
 						aJsFiles.splice(i, 1);
 						i--;
 					}
 				}
 				else {
-					var _js_object = aJsFiles[i].split('/');
-					//TODO 干掉.js
-					PCORE.debug('what\'s class', _js_object);
-					_js_object[0] === 'widget' && (_js_object[0] = 'ui');
+					var _js_object = aJsFiles[i].replace(/\.js$/, '').split('/');
+					PCORE.debug('What\'s Class: ', __fFormatClass(_js_object));
 					//如果是自带类则进行以下判断，否则不判断
-					if (_js_object[0] === 'ui' || _js_object[0] === 'view') {
+					if (_js_object[0] === 'widget' || _js_object[0] === 'view') {
 						//先判断是否有父类
 						var _hasPO;
 						eval('_hasPO = (typeof PCORE.' + _js_object[0] + ')');
 						//如果父类已经存在，判断自身是否有
 						if (_hasPO !== 'undefined') {
-							eval('_hasPO = (typeof PCORE.' + _js_object.join('.') + ')');
+							eval('_hasPO = (typeof PCORE.' + __fFormatClass(_js_object) + ')');
 							//如果自身存在，移除出列表
 							if (_hasPO === 'function') {
+								PCORE.debug('Class is exits.');
 								aJsFiles.splice(i, 1);
 								i--;
 							}
@@ -170,7 +181,6 @@ PCORE.use = function (xJsFile) {
 	for (i = 0; i < aJsFiles.length; i++) {
 		aJsFiles[i] = __fGetPath(aJsFiles[i]);
 	}
-	PCORE.debug('show old callback', PCORE.importCallBack);
 	!PCORE.importCallBack && (PCORE.importCallBack = []);
 	/**
 	 * 检查是否非空的importList
@@ -180,7 +190,7 @@ PCORE.use = function (xJsFile) {
 	if (PCORE.importList && PCORE.importList.length > 0) {
 		//添加本次加载列表进importList
 		PCORE.importList = PCORE.importList.concat(aJsFiles);
-		PCORE.debug('has progress. stop this.');
+		PCORE.debug('Has a progress, stop this and append in the progress.');
 		//go to ready and not load.
 		bLoadIt = false;
 	}
@@ -190,20 +200,21 @@ PCORE.use = function (xJsFile) {
 	}
 	//加载js
 	function __fJsLoader(js) {
-		PCORE.debug('show import list', PCORE.importList);
-		PCORE.debug('will remove list', PCORE.removeList);
+		PCORE.debug(':', 'JS Loader');
+		PCORE.debug('Show import list', PCORE.importList);
+		PCORE.debug('Will remove list', PCORE.removeList);
 		if (js) {
 			var oJs = document.createElement('script');
 			oJs.type = 'text/javascript';
 			oJs.src = js;
 			oHead.appendChild(oJs);
-			PCORE.debug('append js', oJs.src);
 
 			//添加一个移除NODE的列表
 			!PCORE.removeList && (PCORE.removeList = []);
 			PCORE.removeList.push(oJs);
 		}
 		else {
+			// 没有JS引用，但也需要去启动callback
 			__fCallImportOK();
 			return;
 		}
@@ -217,85 +228,85 @@ PCORE.use = function (xJsFile) {
 		}
 		else {
 			oJs.onload = function () {
-				PCORE.debug(this.src, 'loaded.');
+				PCORE.debug(this.src + ' loaded.');
 				__fCallImportOK();
 			};
 			oJs.onerror = function () {
-				PCORE.debug(oJs.src + ' load fail.');
+				PCORE.debug('!', oJs.src + ' load fail.');
 				__fCallImportOK();
 			}
 		}
 
 		function __fCallImportOK() {
-			PCORE.debug('import complete.');
-			PCORE.importList = PCORE.importList.slice(1);
-			PCORE.debug('remain', PCORE.importList.length, 'js in list.');
+			PCORE.debug('Import complete.');
+			PCORE.importList.splice(0, 1);
+			PCORE.debug('Remain', PCORE.importList.length, 'js in list.');
 			//列表还存在未导入数据
 			if (PCORE.importList.length > 0) {
-				PCORE.debug('remain', PCORE.importList);
-				PCORE.debug('next:', PCORE.importList[0]);
+				PCORE.debug('Next:', PCORE.importList[0]);
 				__fJsLoader(PCORE.importList[0]);
 			}
 			//列表全部导完
 			else {
 				//移除新添加的JS NODE，减少内存占用
-				PCORE.debug('remove node list', PCORE.removeList);
 				if (PCORE.removeList) {
 					for (var i = 0; i < PCORE.removeList.length; i++) {
 						var _script = PCORE.removeList[i];
 						var _parent = _script.parentNode;
-						PCORE.debug('node info', _parent, _script);
 						//DEBUG模式不从HEAD中移除导入的JS NODE
-						//!PCORE.isDebug && _parent.removeChild(_script);
-						//TODO 是不是一定要移除呢？
+						!PCORE.isDebug && _parent.removeChild(_script);
 					}
 					PCORE.removeList = null;
 					delete PCORE.removeList;
 				}
+				PCORE.debug('::', 'JS Loader');
+				PCORE.debug(':', 'Callback');
 				//回调callbackList，反转顺序执行
 				var _callback = PCORE.importCallBack.reverse();
 				//引用完即干掉，避免多生枝节
 				PCORE.importCallBack = null;
 				delete PCORE.importCallBack;
-				PCORE.debug('run callback...');
+				PCORE.debug('Run callback...');
 				for (var v in _callback) {
 					if (typeof _callback[v] == 'function') {
-						PCORE.debug('running', _callback[v]);
 						try {
 							_callback[v]();
 						}
 						catch (e) {
-							PCORE.debug('callback has error, maybe js file load fail.');
+							PCORE.debug('!', 'callback has error, maybe js file loaded fail.');
+							PCORE.debug(e);
 						}
 					}
 				}
-				PCORE.debug('all callback ran.');
+				PCORE.debug('All callback ran.');
+				PCORE.debug('::', 'Callback');
 			}
 		}
 	}
 
+	//run it
+	function __fRunReady() {
+		//对importList进行加载
+		PCORE.debug('Loader is ready to run, running...');
+		__fJsLoader(PCORE.importList[0]);
+	}
+
+	// 当没有使用回调的情况下，如果JS都加载完了做延时运行
+	// 使用延时运行的目的是为了，在存在回调的情况下有机会
+	// 去清除掉当前的加载器，以便在回调时去正式运行
 	if (bLoadIt) {
-		var _xTime = setTimeout(function () {
-			PCORE.debug('loader is timeout running...');
-			//对importList进行加载
-			__fJsLoader(PCORE.importList[0]);
-		}, 200);
+		var _xTime = setTimeout(__fRunReady, 200);
 	}
 
 	return {
 		ready: function () {
 			//如果存在加载器，则清除，等新的callback加载完后再开启
 			_xTime && clearTimeout(_xTime);
-			PCORE.debug('push callback to list.');
-			var xCallBack = arguments[0];
 			//添加本次的callback
+			var xCallBack = arguments[0];
 			PCORE.importCallBack.push(xCallBack);
-			PCORE.debug('show now callback', PCORE.importCallBack);
-			if (bLoadIt) {
-				//对importList进行加载
-				PCORE.debug('loader is ready running...');
-				__fJsLoader(PCORE.importList[0]);
-			}
+			PCORE.debug('Push callback to list.');
+			bLoadIt && __fRunReady();
 		}
 	};
 };
@@ -307,6 +318,7 @@ PCORE.use = function (xJsFile) {
  * @returns {*}
  */
 PCORE.parse = function (sTplPath, oOption) {
+	PCORE.debug(':', 'Parser');
 	var _option = {
 		el: '',
 		id: '',
@@ -315,6 +327,7 @@ PCORE.parse = function (sTplPath, oOption) {
 	oOption = PCORE.extend(oOption, _option);
 	var oFn = function () {
 		this.__load(sTplPath);
+		PCORE.debug('::', 'Parser');
 	};
 	oFn.prototype = {
 		__fire: function (sEvent) {
@@ -437,7 +450,7 @@ PCORE.parse = function (sTplPath, oOption) {
 							eval('_cmd =' + sExpression);
 						}
 						catch (e) {
-							PCORE.debug('Invalid expression', sExpression);
+							PCORE.debug('!', 'Invalid expression', '{' + sExpression + '}');
 						}
 						return _cmd;
 					}
@@ -449,7 +462,6 @@ PCORE.parse = function (sTplPath, oOption) {
 				}
 				return sVal;
 			},
-
 			/**
 			 * 构建标签
 			 * @param sAttr {String} 标签字符串
@@ -461,7 +473,6 @@ PCORE.parse = function (sTplPath, oOption) {
 				sAttr = sAttr.replace('{{', '').replace('}}', '');
 				return this.parseData.call(this._data, sAttr, oModel);
 			},
-
 			/**
 			 * 构建HTML
 			 * @param sHtml {String} html字符串
@@ -562,7 +573,7 @@ PCORE.parse = function (sTplPath, oOption) {
 					_vClass.fit($This);
 				}
 				else {
-					PCORE.debug('Invalid Widget or Object not support.');
+					PCORE.debug('!', 'Invalid Widget or Object not support.');
 					$This.remove();
 				}
 			});
@@ -587,7 +598,6 @@ PCORE.parse = function (sTplPath, oOption) {
 					this.data[_path[0]] = xValue;
 				}
 			}
-			PCORE.debug('Show tpl data:', this.data);
 			// TODO sets后续要做到不经update，可以单刷某值，核心作用在双向绑定
 			this.update();
 		}
@@ -601,14 +611,249 @@ PCORE.cache = {
 	tpl: {}
 };
 /**
+ * PCORE选择器
+ * @param sExpression {String} 查找表达式，支持一般的类型查找
+ * @param oScopeDOM {Object} DOM对象，做为查找对象的父级元素
+ * @returns {Object} 返回一个查找结果集以及相关的方法
+ */
+PCORE.selector = function (sExpression, oScopeDOM) {
+	PCORE.debug(':', '<' + sExpression + '>');
+	/**
+	 * 数组内查找
+	 * @param aArray 查询的数组对象
+	 * @param sKey 查询的关键词
+	 * @returns {boolean}
+	 * @private
+	 */
+	function __fInArray(aArray, sKey) {
+		for (var i = 0; i < aArray.length; i++) {
+			if (aArray[i] === sKey) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 向上查找匹配对象
+	 * @param aParentKey 父级的标识数组
+	 * @param oChildren 归递查询的子元素
+	 * @returns {Boolean}
+	 * @private
+	 */
+	function __fFindParent(aParentKey, oChildren) {
+		// 查找到根停止继续查找，返回假
+		if (oChildren === document.documentElement) {
+			return false;
+		}
+		// 如果已经没有断言条件了，返回真
+		if (aParentKey.length === 0) {
+			return true;
+		}
+		// 当前对象的父级进行断言，成功则断了往上，不成功则返回假
+		if (__fAssert(oChildren.parentNode, aParentKey.slice(-1))) {
+			return arguments.callee(aParentKey.slice(0, -1), oChildren.parentNode);
+		}
+		else {
+			return arguments.callee(aParentKey, oChildren.parentNode);
+		}
+	}
+
+	/**
+	 * 链式分解
+	 * @param sChain 链式字符串
+	 * @returns {Array} 分解结果集
+	 * @private
+	 */
+	function __fChain(sChain) {
+		sChain = sChain.replace(/\./g, ' .').replace(/\[/g, ' [');
+		return sChain.replace(/^ /, '').split(' ');
+	}
+
+	/**
+	 *
+	 * @param oObj 断言对象
+	 * @param aAssert 断言条件
+	 * @returns {boolean}
+	 * @private
+	 */
+	function __fAssert(oObj, aAssert) {
+		for (var i = 0; i < aAssert.length; i++) {
+			var sCondition = aAssert[i].substr(1);
+			switch (aAssert[i].substr(0, 1)) {
+				case '#': // id
+					if (oObj.getAttribute('id') !== sCondition) {
+						return false;
+					}
+					break;
+				case '.': // className
+					if (!__fInArray(oObj.getAttribute('class').split(' '), sCondition)) {
+						return false;
+					}
+					break;
+				case '@': // name
+					if (oObj.getAttribute('name') !== sCondition) {
+						return false;
+					}
+					break;
+				case '[': // property
+					var aProp = sCondition.substring(0, sCondition.length - 1).split('=');
+					if (aProp.length === 2) {
+						if (oObj.getAttribute(aProp[0]) !== aProp[1]) {
+							return false;
+						}
+					}
+					else {
+						if (!oObj.getAttribute(aProp[0])) {
+							return false;
+						}
+					}
+					break;
+				default : // tagName
+					if (oObj.tagName.toUpperCase() !== aAssert[i].toUpperCase()) {
+						return false;
+					}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * 获取单项对象
+	 * @param sKey 表达式
+	 * @returns {Array} 返回选择中的对象数组
+	 * @private
+	 */
+	function __fSingle(sKey) {
+		var aGet = [];
+		var sVal = sKey.substr(1);
+		var oScope = oScopeDOM || document;
+		var oObj, i;
+		switch (sKey.substr(0, 1)) {
+			case '#': // ID
+				oObj = document.getElementById(sVal);
+				oObj && aGet.push(oObj);
+				break;
+			case '.': // Class name
+				if (document.getElementsByClassName) {
+					oObj = document.getElementsByClassName(sVal);
+					oObj && (aGet = Array.prototype.slice.call(oObj, 0));
+				}
+				else {
+					oObj = oScope.getElementsByTagName('*');
+					for (i = 0; i < oObj.length; i++) {
+						if (__fInArray(oObj[i].getAttribute('class').split(' '), sVal)) {
+							aGet.push(oObj[i]);
+						}
+					}
+				}
+				break;
+			case '@': // name
+				oObj = document.getElementsByName(sVal);
+				oObj && (aGet = Array.prototype.slice.call(oObj, 0));
+				break;
+			case '[': // property
+				sVal = sKey.substring(1, sKey.length - 1);
+				oObj = oScope.getElementsByTagName('*');
+				var aProp = sVal.split('=');
+				var sProp;
+				if (aProp.length === 2) {
+					sProp = aProp[0];
+					sVal = aProp[1];
+				}
+				for (i = 0; i < oObj.length; i++) {
+					if (sProp) {
+						if (oObj[i].getAttribute(sProp) === sVal) {
+							aGet.push(oObj[i]);
+						}
+					}
+					else {
+						if (oObj[i].getAttribute(sVal)) {
+							aGet.push(oObj[i]);
+						}
+					}
+				}
+				break;
+			default : // tag name
+				oObj = oScope.getElementsByTagName(sKey);
+				oObj && (aGet = Array.prototype.slice.call(oObj, 0));
+		}
+		return aGet;
+	}
+
+	function __fGet(sExpr) {
+		var aResult = [];
+		var aExpr = sExpr.split(' ');
+		var nLast = aExpr.length - 1;
+		var sCurrent = aExpr[nLast];
+		if (aExpr.length > 1) {
+			// multiple
+			var aAssert = aExpr.slice(0, -1);
+			var aChildren = __fGet(sCurrent);
+			for (var j = 0; j < aChildren.length; j++) {
+				var oChildren = aChildren[j];
+				var bHas = __fFindParent(aAssert, oChildren);
+				bHas && aResult.push(oChildren);
+			}
+		}
+		else {
+			// single
+			var aChain = __fChain(sCurrent);
+			var aCurrent = __fSingle(aChain[0]);
+			if (aChain.length > 1) {
+				// 存在链式
+				for (var k = 0; k < aCurrent.length; k++) {
+					if (__fAssert(aCurrent[k], aChain.slice(1))) {
+						aResult.push(aCurrent[k]);
+					}
+				}
+			}
+			else {
+				aResult = aCurrent;
+			}
+		}
+		return aResult;
+	}
+
+	var oSelector = {
+		elements: __fGet(sExpression),
+		each: function (fCallBack) {
+			if (typeof fCallBack === 'function') {
+				for (var i = 0; i < this.elements.length; i++) {
+					fCallBack.call(this.elements[i], i);
+				}
+			}
+		}
+	};
+	PCORE.debug('::', '<' + sExpression + '>');
+	return oSelector;
+};
+/**
  * 输出调戏信息
  */
 PCORE.debug = function () {
-	var _arg = ['CORE_DEBUG:'];
-	for (var i = 0; i < arguments.length; i++) {
-		_arg.push(arguments[i]);
+	if (!PCORE.isDebug || !console) {
+		return;
 	}
-	PCORE.isDebug && console && ((console.debug && console.debug.apply(console, _arg)) || (console.info && console.info(_arg)));
+	var xFirstArg = arguments[0];
+	// 如果是特殊格式的debug将会忽略后续的参数，只使用第一、二个参
+	var sTimerName, aArg = Array.prototype.slice.call(arguments, 0);
+	switch (xFirstArg) {
+		case ':':
+			sTimerName = arguments[1] + ' Timer';
+			console.time && console.time(sTimerName);
+			break;
+		case '::':
+			sTimerName = arguments[1] + ' Timer';
+			console.timeEnd && console.timeEnd(sTimerName);
+			break;
+		case '!':
+			console.warn && console.warn(aArg.slice(1).join(' '));
+			break;
+		default :
+			var _arg = ['CORE_DEBUG:'].concat(aArg);
+			(console.debug && console.debug.apply(console, _arg)) || (console.info && console.info(_arg));
+	}
 };
 /**
  * 是否开启调戏模式
