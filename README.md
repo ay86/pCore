@@ -115,12 +115,12 @@ var oTmpl=PCORE.parse('simple.tpl', {
 当[PCORE.isDebug](#pcoreisdebug)为True时，程序内部的所有内置调试信息将输出到控制台。也可以在开发组件时使用此方法，以便在开发环境里输出调试信息。
 
 目前支持在第一个参数里以字符串的形式声明以下几种特殊调试信息的输出：
-+ [**:**] ——`console.time`
-+ [**::**]——`console.timeEnd`
-+ [**!**] ——`console.warn`
++ （**:**） —— `console.time()`
++ （**::**）—— `console.timeEnd()`
++ （**!**） —— `console.warn()`
 
-第一个参数不指定类型或者非字符串格式都将作为普通的文字信息通过`console.debug`输出。  
-**注意`console.time`必须与`console.timeEnd`成对使用。**
+第一个参数不指定类型或者非字符串格式都将作为普通的文字信息通过`console.debug()`输出。  
+**注意`console.time()`必须与`console.timeEnd()`成对使用。**
 ```js
 PCORE.debug(':', 'JS Loader');          // 开启计时器JS Loader
 PCORE.debug('!', 'Invalid expression'); // 输出警告信息
