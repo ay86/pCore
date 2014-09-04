@@ -351,7 +351,7 @@ PCORE.parse = function (sTplPath, oOption) {
 			}
 			else {
 				// 加载模板文件
-				$.ajax({
+				PCORE.ajax({
 					type: 'GET',
 					url: sTplPath,
 					dataType: 'TEXT',
@@ -519,6 +519,7 @@ PCORE.parse = function (sTplPath, oOption) {
 			}
 			/* 开始渲染 */
 			var _this = this;
+			var $ = PCORE.selector;
 			_this.tpl = sTpl || _this.tpl;
 			var _el;
 			if (_this.el) {
@@ -554,7 +555,7 @@ PCORE.parse = function (sTplPath, oOption) {
 				if (aData instanceof Array) {
 					// 防止原数据被反转污染
 					var _data = aData.concat([]);
-					var _base = $('<div></div>').append($This.clone().removeAttr('pc-repeat')).html();
+					var _base = $This.clone().removeAttr('pc-repeat').outHtml();
 					for (var i = 0, nLen = _data.length; i < nLen; i++) {
 						_data[i]['$index'] = i;
 						$This.before(_this.vm.htmlBuild(_base, _data[i]));
@@ -611,8 +612,8 @@ PCORE.cache = {
 	tpl: {}
 };
 /**
- * PCORE选择器
- * @param sExpression {String} 查找表达式，支持一般的类型查找
+ * 选择器，移植自jClass
+ * @param sExpression {String || Object} DOM对象或者表达式字符串，支持一般的类型查找
  * @param oScopeDOM {Object} DOM对象，做为查找对象的父级元素
  * @returns {Object} 返回一个查找结果集以及相关的方法
  */
@@ -730,6 +731,13 @@ PCORE.selector = function (sExpression, oScopeDOM) {
 		var oScope = oScopeDOM || document;
 		var oObj, i;
 		switch (sKey.substr(0, 1)) {
+			case '<': // create element
+				var _el = document.createElement('div');
+				_el.innerHTML = sKey;
+				oObj = _el.children[0];
+				oObj && aGet.push(oObj);
+				_el = null;
+				break;
 			case '#': // ID
 				oObj = document.getElementById(sVal);
 				oObj && aGet.push(oObj);
@@ -781,7 +789,25 @@ PCORE.selector = function (sExpression, oScopeDOM) {
 		return aGet;
 	}
 
+	/**
+	 * 对所有返回对象执行对应操作
+	 * @param aElements 返回对象数组
+	 * @param fOpaFn 执行的方法
+	 * @private
+	 */
+	function __fAllElementsOpa(aElements, fOpaFn) {
+		for (var i = 0; i < aElements.length; i++) {
+			fOpaFn.call(aElements[i], i);
+		}
+	}
+
 	function __fGet(sExpr) {
+		if (typeof sExpr === 'object' && sExpr.ownerDocument) {
+			return [sExpr];
+		}
+		if (sExpr.substr(0, 1) === '<') {
+			return __fSingle(sExpr);
+		}
 		var aResult = [];
 		var aExpr = sExpr.split(' ');
 		var nLast = aExpr.length - 1;
@@ -815,18 +841,211 @@ PCORE.selector = function (sExpression, oScopeDOM) {
 		return aResult;
 	}
 
+	var aElem = __fGet(sExpression);
 	var oSelector = {
-		elements: __fGet(sExpression),
+		ver: '2.0',
+		elements: aElem,
+		length: aElem.length,
 		each: function (fCallBack) {
 			if (typeof fCallBack === 'function') {
-				for (var i = 0; i < this.elements.length; i++) {
-					fCallBack.call(this.elements[i], i);
+				__fAllElementsOpa(this.elements, function (index) {
+					fCallBack.call(this, index);
+				});
+			}
+			return this;
+		},
+		remove: function () {
+			__fAllElementsOpa(this.elements, function () {
+				this.parentNode.removeChild(this);
+			});
+		},
+		removeAttr: function (sAttr) {
+			__fAllElementsOpa(this.elements, function () {
+				this.removeAttribute(sAttr);
+			});
+			return this;
+		},
+		attr: function (sAttr, sAttrVal) {
+			var aAttr = [];
+			__fAllElementsOpa(this.elements, function () {
+				if (sAttrVal) {
+					this.setAttribute(sAttr, sAttrVal);
+				}
+				else {
+					aAttr.push(this.getAttribute(sAttr));
+				}
+			});
+			if (!sAttrVal) {
+				return aAttr[0];
+			}
+			return this;
+		},
+		append: function (oObj) {
+			var _parent = this.elements[0];
+			if (typeof oObj === 'string') {
+				oObj = __fGet(oObj)[0];
+			}
+			if (oObj.ownerDocument) {
+				_parent.appendChild(oObj);
+			}
+			else {
+				if (oObj.ver) {
+					__fAllElementsOpa(oObj.elements, function () {
+						_parent.appendChild(this);
+					});
 				}
 			}
+			return this;
+		},
+		before: function (oObj) {
+			var _current = this.elements[0];
+			if (typeof oObj === 'string') {
+				oObj = __fGet(oObj)[0];
+			}
+			if (oObj.ownerDocument) {
+				_current.parentNode.insertBefore(oObj, _current);
+			}
+			else {
+				if (oObj.ver) {
+					__fAllElementsOpa(oObj.elements, function () {
+						_current.parentNode.insertBefore(this, _current);
+					});
+				}
+			}
+			return this;
+		},
+		after: function (oObj) {
+			var _current = this.elements[0];
+			if (typeof oObj === 'string') {
+				oObj = __fGet(oObj)[0];
+			}
+			if (oObj.ownerDocument) {
+				_current.parentNode.insertBefore(oObj, _current.nextSibling);
+			}
+			else {
+				if (oObj.ver) {
+					__fAllElementsOpa(oObj.elements, function () {
+						_current.parentNode.insertBefore(this, _current.nextSibling);
+					});
+				}
+			}
+			return this;
+		},
+		clone: function (bDeep) {
+			var _obj = PCORE.extend({}, this);
+			_obj.elements = [this.elements[0].cloneNode(true)];
+			return _obj;
+		},
+		html: function (sInner) {
+			if (sInner) {
+				__fAllElementsOpa(this.elements, function () {
+					this.innerHTML = sInner;
+				});
+			}
+			else {
+				return this.elements[0].innerHTML;
+			}
+			return this;
+		},
+		outHtml: function () {
+			return this.elements[0].outerHTML;
 		}
 	};
 	PCORE.debug('::', '<' + sExpression + '>');
 	return oSelector;
+};
+/**
+ * AJAX请求，移植自jClass
+ * @param jConfig {Object} 请求的参数配置
+ * @returns {XMLHttpRequest} 返回XHR对象
+ */
+PCORE.ajax = function (jConfig) {
+	jConfig = jConfig || {};
+	if (!jConfig['url'] || typeof jConfig['url'] !== 'string') {
+		return null;
+	}
+	function __fInitXHR() {
+		var xmlHttp;
+		if (window.XMLHttpRequest) {
+			xmlHttp = new window.XMLHttpRequest();
+		}
+		else if (window.ActiveXObject) {
+			xmlHttp = new ActiveXObject("Microsoft.XMLHTTP");
+		}
+		return xmlHttp;
+	}
+
+	var xhr = __fInitXHR();
+	var sSendData = null;
+	jConfig['type'] = jConfig['type'] || 'GET';
+	jConfig['dataType'] = jConfig['dataType'] || 'TEXT';
+	jConfig['charset'] = jConfig['charset'] || 'utf-8';
+	jConfig['cache'] = !!jConfig['cache'];
+	jConfig['async'] = (typeof jConfig['async'] === 'boolean') ? !!jConfig['async'] : true;
+	jConfig['retryCount'] = jConfig['retryCount'] || 3;
+	if (typeof jConfig['data'] === 'object') {
+		var aPara = [];
+		for (var v in jConfig['data']) {
+			if (jConfig['data'][v] instanceof Array) {
+				aPara.push(v + '=' + jConfig['data'][v].join('&' + v + '='));
+			}
+			else {
+				aPara.push(v + '=' + jConfig['data'][v]);
+			}
+		}
+		sSendData = aPara.join('&');
+	}
+	jConfig['success'] = jConfig['success'] || function () {
+		PCORE.debug('Not callback success(), but AJAX request is successfully!');
+	};
+	jConfig['error'] = jConfig['error'] || function () {
+		PCORE.debug('!', 'Request is Failed.');
+	};
+	jConfig.retry = function () {
+		if (jConfig['retryCount'] <= 0) {
+			return false;
+		}
+		jConfig['retryCount']--;
+		__fRun();
+	};
+	function __fRun() {
+		xhr.open(jConfig['type'], jConfig['url'] + (jConfig['cache'] ? '' : ('?_=' + Math.random())), jConfig['async']);
+		switch (jConfig['type'].toUpperCase()) {
+			case 'POST':
+				xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded;charset=' + jConfig['charset']);
+				break;
+			//case 'HEAD':
+				//xhr.getAllResponseHeaders()
+				//xhr.getResponseHeader("Last-Modified")
+			//	break;
+		}
+		xhr.onreadystatechange = function () {
+			if (this.readyState === 4) {
+				switch (this.status) {
+					case 200:
+						var xResult;
+						switch (jConfig['dataType'].toUpperCase()) {
+							case 'JSON':
+								xResult = eval('(' + this.responseText + ')');
+								break;
+							case 'XML':
+								xResult = this.responseXML;
+								break;
+							default :
+								xResult = this.responseText;
+						}
+						jConfig['success'].call(jConfig, xResult, this);
+						break;
+					default :
+						jConfig['error'].call(jConfig, this.status);
+				}
+			}
+		};
+		xhr.send(sSendData);
+	}
+
+	__fRun();
+	return xhr;
 };
 /**
  * 输出调戏信息
