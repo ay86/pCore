@@ -134,7 +134,7 @@ $('#open').append($('div p.test').clone().attr('title', 'this is clone.'));
 本方法提供AJAX重发功能，可在触发`error`回调时执行`retry()`方法，重新执行AJAX请求，重试次数由配置`retryCount`指定，默认为3次。  
 **注意本方法只提供`success`, `error`的回调，与jQuery支持的回调方法略有不同，并且不支持`$.get()`, `$.post()`等方法。**
 ```js
-PCORE.ajax({
+var xhr = PCORE.ajax({
 	url: 'http://www.simple.com/simple.php',
 	type: 'POST',
 	dataType: 'JSON',
@@ -145,10 +145,10 @@ PCORE.ajax({
 	},
 	success: function (jData, xhr){
 		// success callback
-		// this = jConfig
+		// this === jConfig
 	},
 	error: function (nStatus) {
-		// error call back
+		// error callback
 		// this.retry();
 	}
 });
