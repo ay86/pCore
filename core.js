@@ -960,7 +960,29 @@ PCORE.selector = function (sExpression, oScopeDOM) {
  * @returns {XMLHttpRequest} 返回XHR对象
  */
 PCORE.ajax = function (jConfig) {
-	jConfig = jConfig || {};
+	// Normal config
+	jConfig = PCORE.extend({
+		type: 'GET',
+		dataType: 'TEXT',
+		charset: 'utf-8',
+		cache: true,
+		async: true,
+		retryCount: 3,
+		success: function () {
+			PCORE.debug('Not callback success(), but AJAX request is successfully!');
+		},
+		error: function () {
+			PCORE.debug('!', 'Request is Failed.');
+		}
+	}, jConfig, true);
+	// 是否全部都有此方法，还是只在error发生时才有
+	jConfig.retry = function () {
+		if (jConfig['retryCount'] <= 0) {
+			return false;
+		}
+		jConfig['retryCount']--;
+		__fRun();
+	};
 	if (!jConfig['url'] || typeof jConfig['url'] !== 'string') {
 		return null;
 	}
@@ -977,12 +999,6 @@ PCORE.ajax = function (jConfig) {
 
 	var xhr = __fInitXHR();
 	var sSendData = null;
-	jConfig['type'] = jConfig['type'] || 'GET';
-	jConfig['dataType'] = jConfig['dataType'] || 'TEXT';
-	jConfig['charset'] = jConfig['charset'] || 'utf-8';
-	jConfig['cache'] = !!jConfig['cache'];
-	jConfig['async'] = (typeof jConfig['async'] === 'boolean') ? !!jConfig['async'] : true;
-	jConfig['retryCount'] = jConfig['retryCount'] || 3;
 	if (typeof jConfig['data'] === 'object') {
 		var aPara = [];
 		for (var v in jConfig['data']) {
@@ -995,28 +1011,15 @@ PCORE.ajax = function (jConfig) {
 		}
 		sSendData = aPara.join('&');
 	}
-	jConfig['success'] = jConfig['success'] || function () {
-		PCORE.debug('Not callback success(), but AJAX request is successfully!');
-	};
-	jConfig['error'] = jConfig['error'] || function () {
-		PCORE.debug('!', 'Request is Failed.');
-	};
-	jConfig.retry = function () {
-		if (jConfig['retryCount'] <= 0) {
-			return false;
-		}
-		jConfig['retryCount']--;
-		__fRun();
-	};
 	function __fRun() {
-		xhr.open(jConfig['type'], jConfig['url'] + (jConfig['cache'] ? '' : ('?_=' + Math.random())), jConfig['async']);
+		xhr.open(jConfig['type'], jConfig['url'] + (jConfig['cache'] && jConfig['type'] !== 'HEAD' ? '' : ('?_=' + Math.random())), jConfig['async']);
 		switch (jConfig['type'].toUpperCase()) {
 			case 'POST':
 				xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded;charset=' + jConfig['charset']);
 				break;
 			//case 'HEAD':
-				//xhr.getAllResponseHeaders()
-				//xhr.getResponseHeader("Last-Modified")
+			//xhr.getAllResponseHeaders()
+			//xhr.getResponseHeader("Last-Modified")
 			//	break;
 		}
 		xhr.onreadystatechange = function () {
