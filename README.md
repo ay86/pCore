@@ -104,8 +104,8 @@ var oTmpl=PCORE.parse('simple.tpl', {
 	@param oScopeDOM {Object} DOM对象，做为查找对象的父级元素
 	@returns {Object} 返回一个查找结果集以及相关的方法
 
-移植自[jClass](/ay86/jClass)，使用方法与jQuery的基本一致，但只提供部分API。  
-支持`tagName`, `className`, `name`, `id`, `attribute`, `string` 等方式选择或创建DOM对象。支持链式表达，暂不支持只对子级进行查找模式（`div > p`）*默认子孙级都查找*，查找`name`时请使用识别码`@`，比如：`@username`。
+移植自[jClass](http://github.com/ay86/jClass)，使用方法与jQuery的基本一致，但只提供部分API。  
+支持`tagName`, `className`, `name`, `id`, `attribute`, `string` 等方式选择或创建DOM对象。   支持链式表达，暂不支持只对子级进行查找模式（`div > p`）*默认子孙级都查找*，查找`name`时请使用识别码`@`，比如：`@username`。
 
 - `each()`
 - `remove()`
@@ -120,7 +120,8 @@ var oTmpl=PCORE.parse('simple.tpl', {
 
 以上API的使用与jQuery的使用一致，支持链式操作。`outHtml()`是jClass自有的API，支持返回DOM元素的HTML代码，包含自身标签。
 ```js
-PCORE.selector('#open').append(PCORE.selector('div p.test').clone().attr('title', 'this is clone.'));
+var $=PCORE.selector;
+$('#open').append($('div p.test').clone().attr('title', 'this is clone.'));
 ```
 ##PCORE.ajax
 
@@ -128,12 +129,12 @@ PCORE.selector('#open').append(PCORE.selector('div p.test').clone().attr('title'
 	@param jConfig {Object} 请求的参数配置
 	@returns {XMLHttpRequest} 返回XHR对象
 
-移植自[jClass](/ay86/jClass)，使用方法与jQuery的基本一致，但只提供部分API。  
-方法执行后返回XHR对象，可将此对象赋值给变量后，执行`abort()`操作。
+移植自[jClass](http://github.com/ay86/jClass)，使用方法与jQuery的基本一致，但只提供部分API。  
+方法执行后返回XHR对象，可将此对象赋值给变量后，执行`abort()`操作。  
 本方法提供AJAX重发功能，可在触发`error`回调时执行`retry()`方法，重新执行AJAX请求，重试次数由配置`retryCount`指定，默认为3次。  
 **注意本方法只提供`success`, `error`的回调，与jQuery支持的回调方法略有不同，并且不支持`$.get()`, `$.post()`等方法。**
 ```js
-PCORE.ajax({
+var xhr = PCORE.ajax({
 	url: 'http://www.simple.com/simple.php',
 	type: 'POST',
 	dataType: 'JSON',
@@ -144,10 +145,10 @@ PCORE.ajax({
 	},
 	success: function (jData, xhr){
 		// success callback
-		// this = jConfig
+		// this === jConfig
 	},
 	error: function (nStatus) {
-		// error call back
+		// error callback
 		// this.retry();
 	}
 });
