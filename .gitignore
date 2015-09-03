@@ -1,4 +1,5 @@
 .svn/
 .idea/
+.DS_Store/
 *.yaml
-Desktop.ini
+desktop.ini
