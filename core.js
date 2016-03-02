@@ -1,7 +1,7 @@
 /**
  * JavaScript Power Core
  * @Author: AngusYoung
- * @Version: 2.4
+ * @Version: 2.5
  * @Since: 13-01-01
  */
 
@@ -70,11 +70,13 @@ PCORE.use = function (xJsFile) {
 	PCORE.debug('Use now...');
 	var oHead = document.getElementsByTagName('head')[0];
 	if (!oHead) {
-		return {ready: function () {
-			PCORE.debug('!', 'DOM Error, stop this.');
-		}};
+		return {
+			ready: function () {
+				PCORE.debug('!', 'DOM Error, stop this.');
+			}
+		};
 	}
-	var sResource = PCORE.resource + (PCORE.resource.slice(-1) === '/' ? '' : '/');
+	var sResource = PCORE.config().baseURL + (PCORE.config().baseURL.slice(-1) === '/' ? '' : '/');
 	var aJsFiles = typeof xJsFile === 'string' ? xJsFile.split(';') : xJsFile;
 	var i;
 
@@ -254,7 +256,7 @@ PCORE.use = function (xJsFile) {
 						var _script = PCORE.removeList[i];
 						var _parent = _script.parentNode;
 						//DEBUG模式不从HEAD中移除导入的JS NODE
-						!PCORE.isDebug && _parent.removeChild(_script);
+						!PCORE.config().isDebug && _parent.removeChild(_script);
 					}
 					PCORE.removeList = null;
 					delete PCORE.removeList;
@@ -385,7 +387,7 @@ PCORE.parse = function (sTplPath, oOption) {
 			}
 			else {
 				if (_tag.length) {
-					if (_tag[0].type === 'text/tpl') {
+					if (_tag[0].type === 'text/pc-template') {
 						sTemplate = _tag[0].innerHTML;
 					}
 					else {
@@ -432,6 +434,7 @@ PCORE.parse = function (sTplPath, oOption) {
 				else {
 					sVal = oModel[sProperty] || this[sProperty];
 				}
+				//console.log(sVal,sProperty)
 				if (typeof sVal === 'undefined') {
 					// 解析表达式
 					function __fRunEval(sExpression) {
@@ -439,24 +442,32 @@ PCORE.parse = function (sTplPath, oOption) {
 						var v;
 						// this data
 						for (v in this) {
-							eval('var ' + v + '=this[\'' + v + '\']');
+							eval('var ' + v + '= this[\'' + v + '\']');
 						}
 						// model data
 						for (v in oModel) {
-							eval('var ' + v + '=oModel[\'' + v + '\']');
+							eval('var ' + v + '= oModel[\'' + v + '\']');
 						}
 						var _cmd;
 						try {
 							eval('_cmd =' + sExpression);
 						}
 						catch (e) {
-							PCORE.debug('!', 'Invalid expression', '{' + sExpression + '}');
+							//console.error(e)
+							try {
+								eval('_cmd = {' + sExpression + '}');
+								_cmd = '{{' + sExpression + '}}';
+							}
+							catch (e) {
+								PCORE.debug('!', 'Invalid expression', '{' + sExpression + '}');
+							}
 						}
+
 						return _cmd;
 					}
 
 					var _expr = __fRunEval.call(this, sProperty);
-					if (_expr != undefined) {
+					if (typeof _expr !== 'undefined') {
 						sVal = _expr;
 					}
 				}
@@ -482,21 +493,26 @@ PCORE.parse = function (sTplPath, oOption) {
 			 */
 			htmlBuild: function (sHtml, oModel) {
 				var _this = this;
-				sHtml = sHtml.replace(/{{([^}}]*)}}/g, function (s, $1) {
-					var sVal = _this.tagBuild($1.replace(/\s/g, ''), oModel);
-					if (typeof sVal === 'object') {
+				sHtml = sHtml.replace(/((pc-[^\s>]+?)="|){{([^}}]*)}}/g, function (s, $1, $2, $3) {
+					//if ($1 && $1.indexOf('pc-') > -1) {
+					//	return s;
+					//}
+					//console.info(s,$1,$2,$3)
+					var sVal = _this.tagBuild($3.replace(/\s/g, ''), oModel);
+					//console.warn(sVal)
+					if (typeof sVal === 'object' && sVal) {
 						// 渲染组件
-						return '<var ob="' + _this.keyBox(sVal) + '"></var>';
+						return $1 + '<var ob="' + _this.keyBox(sVal) + '"></var>';
 					}
 					if (typeof sVal === 'function') {
-						return (new sVal).toString();
+						return $1 + (new sVal).toString();
 					}
 					else if (typeof sVal === 'string' || typeof sVal === 'number' || typeof sVal === 'boolean') {
 						// 渲染变量
-						return sVal;
+						return $1 + sVal;
 					}
 					else {
-						return s;
+						return '';
 					}
 				});
 				return sHtml;
@@ -537,32 +553,143 @@ PCORE.parse = function (sTplPath, oOption) {
 			}
 			_el.innerHTML = this.tpl;
 			/*渲染指令，指令应注重优先顺序，具备先决条件的必须写在前面*/
-			// 逻辑指令
-			$('[pc-if]', _el).each(function () {
-				var $This = $(this);
-				var _if = _this.vm.tagBuild($This.attr('pc-if'));
-				if (_if && _if.length) {
-					$This.removeAttr('pc-if');
+			//console.log(_el.innerHTML)
+
+			var __fAssertAttr = function (sHTML) {
+				if (/pc\-(if|repeat|class|selected|disabled)/g.test(sHTML)) {
+					return RegExp.$1;
+				}
+				return null;
+			};
+
+			var __fInstruct_class = function (oModel) {
+				var $This = this;
+				var _attrVal;
+
+				var _pcc = $This.attr('pc-class');
+				var _assert = _this.vm.tagBuild(_pcc.replace(/^{{((?:\s'|')(.*)':).*}}$/, function (s, $1, $2) {
+					_attrVal = $2;
+					return s.replace($1, '');
+				}), oModel);
+
+				if (_assert) {
+					$This.addClass(_attrVal);
+				}
+
+				$This.removeAttr('pc-class');
+			};
+
+			var __fInstruct_attribute = function (sAttrName, oModel) {
+				var $This = this;
+				var _attrVal;
+
+				var _assert = _this.vm.tagBuild($This.attr('pc-' + sAttrName).replace(/^{{((?:\s'|')(.*)':).*}}$/, function (s, $1, $2) {
+					_attrVal = $2;
+					return s.replace($1, '');
+				}), oModel);
+
+				if (_assert) {
+					$This.attr(sAttrName, sAttrName);
+				}
+
+				$This.removeAttr('pc-' + sAttrName);
+			};
+
+			var __fInstruct_Repeat = function (nIndex, oModel) {
+				var $This = this;
+				var $Dom;
+
+				oModel['$index'] = nIndex;
+				var _base = $This.clone().removeAttr('pc-repeat').outHtml();
+				var _buildHtml = _this.vm.htmlBuild(_base, oModel);
+				if (_buildHtml.indexOf('<tr') === 0) {
+					var _table = $('<table></table>').html(_this.vm.htmlBuild(_base, oModel));
+					$Dom = $('tr', _table.elements[0]);
+					$This.before($Dom);
 				}
 				else {
-					$This.remove();
+					$Dom = $(_buildHtml);
+					$This.before($Dom);
 				}
-			});
-			// 循环指令
-			$('[pc-repeat]', _el).each(function () {
+				if (__fAssertAttr($Dom.outHtml()) == 'class') {
+					__fInstruct_class.call($Dom, oModel);
+				}
+			};
+
+			function __fCheckAttr() {
 				var $This = $(this);
-				var aData = _this.vm.tagBuild($This.attr('pc-repeat'));
-				if (aData instanceof Array) {
-					// 防止原数据被反转污染
-					var _data = aData.concat([]);
-					var _base = $This.clone().removeAttr('pc-repeat').outHtml();
-					for (var i = 0, nLen = _data.length; i < nLen; i++) {
-						_data[i]['$index'] = i;
-						$This.before(_this.vm.htmlBuild(_base, _data[i]));
+				// 逻辑指令
+				if ($This.attr('pc-if')) {
+					if (!/^{{.*}}$/.test($This.attr('pc-if'))) {
+						if ($This.attr('pc-if') === 'true' || $This.attr('pc-if') === '1') {
+							$This.removeAttr('pc-if');
+						}
+						else {
+							$This.remove();
+						}
 					}
-					$This.remove();
+					else {
+						var _if = _this.vm.tagBuild($This.attr('pc-if'));
+						if (_if && ((_if instanceof Array && _if.length) || (typeof _if === 'boolean' || typeof _if === 'number'))) {
+							$This.removeAttr('pc-if');
+						}
+						else {
+							$This.remove();
+						}
+					}
 				}
-			});
+				// 循环指令
+				else if ($This.attr('pc-repeat')) {
+					var aData = _this.vm.tagBuild($This.attr('pc-repeat'));
+					$This.removeAttr('pc-repeat');
+					if (aData instanceof Array) {
+						// 防止原数据被反转污染
+						var _data = [].concat(aData);
+						for (var i = 0, nLen = _data.length; i < nLen; i++) {
+							var _model = _data[i];
+							if (typeof _model !== 'object') {
+								_model = {
+									value: _model
+								}
+							}
+
+							__fInstruct_Repeat.call($This, i, _model);
+						}
+						$This.remove();
+					}
+					else if (typeof aData === 'number') {
+						for (var j = 0; j < aData; j++) {
+							__fInstruct_Repeat.call($This, j, {});
+						}
+						$This.remove();
+					}
+				}
+				// 属性断言
+				else if ($This.attr('pc-class')) {
+					__fInstruct_class.call($This);
+				}
+				else if ($This.attr('pc-selected')) {
+					__fInstruct_attribute.call($This, 'selected');
+				}
+				else if ($This.attr('pc-disabled')) {
+					__fInstruct_attribute.call($This, 'disabled');
+				}
+				else if ($This.attr('pc-checked')) {
+					__fInstruct_attribute.call($This, 'checked');
+				}
+			}
+
+			// 指令迭代
+			(function (sSelector) {
+				$(sSelector, _el).each(function () {
+					__fCheckAttr.call(this);
+				});
+				//console.warn(_el.innerHTML)
+				var _attr = __fAssertAttr(_el.innerHTML);
+				if (_attr) {
+					arguments.callee('[pc-' + _attr + ']');
+				}
+			})('*');
 			// 渲染标签
 			_el.innerHTML = _this.vm.htmlBuild(_el.innerHTML);
 			// 初始化模板中存在的组件
@@ -880,6 +1007,29 @@ PCORE.selector = function (sExpression, oScopeDOM) {
 			}
 			return this;
 		},
+		addClass: function (sClassName) {
+			if (sClassName) {
+				__fAllElementsOpa(this.elements, function () {
+					var _class = this.getAttribute('class');
+					var aClass = _class ? _class.split(' ') : [];
+					if (!__fInArray(aClass, sClassName)) {
+						aClass.push(sClassName);
+						this.setAttribute('class', aClass.join(' '));
+					}
+				});
+			}
+			return this;
+		},
+		removeClass: function (sClassName) {
+			if (sClassName) {
+				__fAllElementsOpa(this.elements, function () {
+					var _class = this.getAttribute('class');
+					var sClass = (' ' + _class + ' ').replace(' ' + sClassName + ' ', ' ');
+					this.setAttribute('class', sClass.replace(/(^ | $)/, ''));
+				});
+			}
+			return this;
+		},
 		append: function (oObj) {
 			var _parent = this.elements[0];
 			if (typeof oObj === 'string') {
@@ -961,7 +1111,7 @@ PCORE.selector = function (sExpression, oScopeDOM) {
  */
 PCORE.ajax = function (jConfig) {
 	// Normal config
-	jConfig = PCORE.extend({
+	jConfig = PCORE.extend(PCORE.extend({
 		type: 'GET',
 		dataType: 'TEXT',
 		charset: 'utf-8',
@@ -974,7 +1124,7 @@ PCORE.ajax = function (jConfig) {
 		error: function () {
 			PCORE.debug('!', 'Request is Failed.');
 		}
-	}, jConfig, true);
+	}, PCORE.config().globalAjax, true), jConfig, true);
 	// 是否全部都有此方法，还是只在error发生时才有
 	jConfig.retry = function () {
 		if (jConfig['retryCount'] <= 0) {
@@ -1011,9 +1161,26 @@ PCORE.ajax = function (jConfig) {
 		}
 		sSendData = aPara.join('&');
 	}
+	else if (typeof jConfig['data'] === 'string') {
+		sSendData = jConfig['data'];
+	}
+
+	jConfig['type'] = jConfig['type'].toUpperCase();
+	jConfig['dataType'] = jConfig['dataType'].toUpperCase();
+
 	function __fRun() {
-		xhr.open(jConfig['type'], jConfig['url'] + (jConfig['cache'] && jConfig['type'] !== 'HEAD' ? '' : ('?_=' + Math.random())), jConfig['async']);
-		switch (jConfig['type'].toUpperCase()) {
+		var aQuery = [];
+		if (jConfig['type'] === 'GET' && sSendData) {
+			aQuery.push(sSendData);
+		}
+		if (!jConfig['cache'] || jConfig['type'] === 'HEAD') {
+			aQuery.push('_=' + Math.random());
+		}
+		if (aQuery.length) {
+			jConfig['url'] += '?' + aQuery.join('&');
+		}
+		xhr.open(jConfig['type'], jConfig['url'], jConfig['async']);
+		switch (jConfig['type']) {
 			case 'POST':
 				xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded;charset=' + jConfig['charset']);
 				break;
@@ -1027,7 +1194,7 @@ PCORE.ajax = function (jConfig) {
 				switch (this.status) {
 					case 200:
 						var xResult;
-						switch (jConfig['dataType'].toUpperCase()) {
+						switch (jConfig['dataType']) {
 							case 'JSON':
 								xResult = eval('(' + this.responseText + ')');
 								break;
@@ -1051,10 +1218,17 @@ PCORE.ajax = function (jConfig) {
 	return xhr;
 };
 /**
+ * 设置全局ajax参数
+ * @param jConfig
+ */
+PCORE.setAjax = function (jConfig) {
+	PCORE.config({globalAjax: jConfig});
+};
+/**
  * 输出调戏信息
  */
 PCORE.debug = function () {
-	if (!PCORE.isDebug || !console) {
+	if (!PCORE.config().isDebug || !console) {
 		return;
 	}
 	var xFirstArg = arguments[0];
@@ -1078,12 +1252,29 @@ PCORE.debug = function () {
 	}
 };
 /**
- * 是否开启调戏模式
- * @type {Boolean}
+ * 读取/设置配置信息
+ * @param jConfig
  */
-PCORE.isDebug = false;
-/**
- * 指定JS的资源目录路径
- * @type {String}
- */
-PCORE.resource = '/';
+PCORE.config = function (jConfig) {
+	var _normal = {
+		/**
+		 * 指定JS的资源目录路径
+		 * @type {String}
+		 */
+		baseURL: '/',
+		/**
+		 * 是否开启调戏模式
+		 * @type {Boolean}
+		 */
+		isDebug: false,
+		/**
+		 * 全局的ajax参数
+		 */
+		globalAjax: {}
+	};
+	if (jConfig) {
+		var _config = PCORE.__config || _normal;
+		PCORE.__config = PCORE.extend(_config, jConfig, true);
+	}
+	return PCORE.__config || _normal;
+};
