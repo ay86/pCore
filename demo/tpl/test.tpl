@@ -1,7 +1,7 @@
-<script type="text/tpl" id="not-this">
+<script type="text/pc-template" id="not-this">
 <div>Not this template.</div>
 </script>
-<script type="text/tpl" id="test">
+<script type="text/pc-template" id="test">
 <h1>{{title}}</h1>
 <ul pc-if="{{member}}">
     <li pc-repeat="{{ member }}">{{$index+1}}. Name: {{name}} Age: {{ age }}</li>

@@ -6,7 +6,7 @@
  */
 
 //PCORE.isDebug = true;
-PCORE.resource = '/js/pCore/';
+PCORE.config({baseURL:'/js/pCore/'});
 $(function () {
 	var oWin;
 	var $Open = $('#open');
